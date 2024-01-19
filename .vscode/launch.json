@@ -6,6 +6,6 @@
             "type": "chrome",
             "request": "launch",
             "file": "${workspaceFolder}/index.html"
-        }
+        },
     ]
 }

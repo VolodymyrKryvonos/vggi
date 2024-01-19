@@ -14,6 +14,7 @@ function deg2rad(angle) {
 function Model(name) {
     this.name = name;
     this.iVertexBuffer = gl.createBuffer();
+    this.iNormalBuffer = gl.createBuffer();
     this.count = 0;
 
     this.BufferData = function (vertices) {
@@ -23,14 +24,23 @@ function Model(name) {
 
         this.count = vertices.length / 3;
     }
+    this.BufferDataNormal = function (normals) {
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.iNormalBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normals), gl.STREAM_DRAW);
+
+    }
 
     this.Draw = function () {
 
         gl.bindBuffer(gl.ARRAY_BUFFER, this.iVertexBuffer);
         gl.vertexAttribPointer(shProgram.iAttribVertex, 3, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(shProgram.iAttribVertex);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.iNormalBuffer);
+        gl.vertexAttribPointer(shProgram.iAttribNormal, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(shProgram.iAttribNormal);
 
-        gl.drawArrays(gl.LINE_STRIP, 0, this.count);
+        gl.drawArrays(gl.TRIANGLES, 0, this.count);
     }
 }
 
@@ -82,31 +92,82 @@ function draw() {
 
     /* Draw the six faces of a cube, with different colors. */
     gl.uniform4fv(shProgram.iColor, [1, 1, 0, 1]);
+    let x1 = document.getElementById('x1').value,
+        y1 = document.getElementById('y1').value,
+        z1 = document.getElementById('z1').value,
+        x2 = document.getElementById('x2').value,
+        y2 = document.getElementById('y2').value,
+        z2 = document.getElementById('z2').value
+    gl.uniform3fv(shProgram.iLightLocation, [x1, y1, z1]);
+    gl.uniform3fv(shProgram.iLightDirection, [x2, y2, z2]);
+    gl.uniform1f(shProgram.iAngle, document.getElementById('angle').value);
+    gl.uniform1f(shProgram.iFocus, document.getElementById('focus').value);
 
     surface.Draw();
 }
 
-function reDraw(){
+function reDraw() {
     surface.BufferData(CreateSurfaceData());
+    surface.BufferDataNormal(CreateSurfaceDataNormal());
     draw()
 }
 
 function CreateSurfaceData() {
     let vertexList = [];
     let numStepsI = document.getElementById('numSteps').value,
-        numStepsJ = numStepsI/2;
+        numStepsJ = numStepsI / 2;
 
     for (let i = 0; i < numStepsI; i++) {
         for (let j = -numStepsJ; j < numStepsJ; j++) {
-            vertexList.push(...monge(i/10, j/10))
+            vertexList.push(...monge((i) / 10, (j) / 10))
+            vertexList.push(...monge((i + 1) / 10, (j) / 10))
+            vertexList.push(...monge((i) / 10, (j + 1) / 10))
+            vertexList.push(...monge((i) / 10, (j + 1) / 10))
+            vertexList.push(...monge((i + 1) / 10, (j) / 10))
+            vertexList.push(...monge((i + 1) / 10, (j + 1) / 10))
         }
     }
 
     return vertexList;
 }
+function CreateSurfaceDataNormal() {
+    let normalList = [];
+    let numStepsI = document.getElementById('numSteps').value,
+        numStepsJ = numStepsI / 2;
+
+    for (let i = 0; i < numStepsI; i++) {
+        for (let j = -numStepsJ; j < numStepsJ; j++) {
+            normalList.push(...mongeNormal((i) / 10, (j) / 10))
+            normalList.push(...mongeNormal((i + 1) / 10, (j) / 10))
+            normalList.push(...mongeNormal((i) / 10, (j + 1) / 10))
+            normalList.push(...mongeNormal((i) / 10, (j + 1) / 10))
+            normalList.push(...mongeNormal((i + 1) / 10, (j) / 10))
+            normalList.push(...mongeNormal((i + 1) / 10, (j + 1) / 10))
+        }
+    }
+
+    return normalList;
+}
 const scaler = 0.1
 function monge(a, t) {
     return [scaler * x(a, t), scaler * y(a, t), scaler * z(t)]
+}
+const e = 0.001
+function mongeNormal(a, t) {
+    let vert = monge(a, t)
+    let vertA = monge(a + e, t)
+    let vertB = monge(a, t + e)
+    const n1 = [
+        (vert[0] - vertA[0]) / e,
+        (vert[1] - vertA[1]) / e,
+        (vert[2] - vertA[2]) / e
+    ]
+    const n2 = [
+        (vert[0] - vertB[0]) / e,
+        (vert[1] - vertB[1]) / e,
+        (vert[2] - vertB[2]) / e
+    ]
+    return m4.normalize(m4.cross(n1, n2))
 }
 const { PI, sin, cos } = Math;
 const r = 1, theta = PI / 2, a0 = 1, aParam = 0.1;
@@ -132,11 +193,17 @@ function initGL() {
     shProgram.Use();
 
     shProgram.iAttribVertex = gl.getAttribLocation(prog, "vertex");
+    shProgram.iAttribNormal = gl.getAttribLocation(prog, "normal");
     shProgram.iModelViewProjectionMatrix = gl.getUniformLocation(prog, "ModelViewProjectionMatrix");
     shProgram.iColor = gl.getUniformLocation(prog, "color");
+    shProgram.iLightLocation = gl.getUniformLocation(prog, "lightLocation");
+    shProgram.iLightDirection = gl.getUniformLocation(prog, "lightDirection");
+    shProgram.iAngle = gl.getUniformLocation(prog, "angle");
+    shProgram.iFocus = gl.getUniformLocation(prog, "focus");
 
     surface = new Model('Surface');
     surface.BufferData(CreateSurfaceData());
+    surface.BufferDataNormal(CreateSurfaceDataNormal());
 
     gl.enable(gl.DEPTH_TEST);
 }
