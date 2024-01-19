@@ -4,6 +4,8 @@ let gl;                         // The webgl context.
 let surface;                    // A surface model
 let shProgram;                  // A shader program
 let spaceball;                  // A SimpleRotator object that lets the user rotate the view by mouse.
+let surfaceLight;
+let surfaceLightLine;
 
 function deg2rad(angle) {
     return angle * Math.PI / 180;
@@ -42,6 +44,14 @@ function Model(name) {
 
         gl.drawArrays(gl.TRIANGLES, 0, this.count);
     }
+    this.DrawLine = function () {
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.iVertexBuffer);
+        gl.vertexAttribPointer(shProgram.iAttribVertex, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(shProgram.iAttribVertex);
+
+        gl.drawArrays(gl.LINE_STRIP, 0, this.count);
+    }
 }
 
 
@@ -68,6 +78,7 @@ function ShaderProgram(name, program) {
  * (Note that the use of the above drawPrimitive function is not an efficient
  * way to draw with WebGL.  Here, the geometry is so simple that it doesn't matter.)
  */
+const { now } = Date
 function draw() {
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -97,24 +108,37 @@ function draw() {
         z1 = document.getElementById('z1').value,
         x2 = document.getElementById('x2').value,
         y2 = document.getElementById('y2').value,
-        z2 = document.getElementById('z2').value
-    gl.uniform3fv(shProgram.iLightLocation, [x1, y1, z1]);
-    gl.uniform3fv(shProgram.iLightDirection, [x2, y2, z2]);
+        z2 = document.getElementById('z2').value,
+        time = now() * 0.001;
+    gl.uniform3fv(shProgram.iLightLocation, [cos(time), sin(time), z1]);
+    // gl.uniform3fv(shProgram.iLightDirection, [-cos(time), -sin(time), -z1]);
+    // gl.uniform3fv(shProgram.iLightLocation, [x1, y1, z1]);
+    gl.uniform3fv(shProgram.iLightDirection, [-(cos(time)- x2), -(sin(time) - y2), -(z1 - z2)]);
     gl.uniform1f(shProgram.iAngle, document.getElementById('angle').value);
     gl.uniform1f(shProgram.iFocus, document.getElementById('focus').value);
 
     surface.Draw();
+    gl.uniform1f(shProgram.iAngle, -1);
+    gl.uniformMatrix4fv(shProgram.iModelViewProjectionMatrix, false, m4.multiply(
+        modelViewProjection,
+        m4.translation(cos(time), sin(time), z1)
+        // m4.translation(x1, y1, z1)
+    ));
+    surfaceLight.Draw();
+    surfaceLightLine.BufferData([0, 0, 0, -cos(time), -sin(time), -z1]);
+    surfaceLightLine.DrawLine()
 }
 
 function reDraw() {
-    surface.BufferData(CreateSurfaceData());
-    surface.BufferDataNormal(CreateSurfaceDataNormal());
+    // surface.BufferData(CreateSurfaceData());
+    // surface.BufferDataNormal(CreateSurfaceDataNormal());
     draw()
+    window.requestAnimationFrame(reDraw)
 }
 
 function CreateSurfaceData() {
     let vertexList = [];
-    let numStepsI = document.getElementById('numSteps').value,
+    let numStepsI = 100,
         numStepsJ = numStepsI / 2;
 
     for (let i = 0; i < numStepsI; i++) {
@@ -132,7 +156,7 @@ function CreateSurfaceData() {
 }
 function CreateSurfaceDataNormal() {
     let normalList = [];
-    let numStepsI = document.getElementById('numSteps').value,
+    let numStepsI = 100,
         numStepsJ = numStepsI / 2;
 
     for (let i = 0; i < numStepsI; i++) {
@@ -147,6 +171,34 @@ function CreateSurfaceDataNormal() {
     }
 
     return normalList;
+}
+function CreateSurfaceDataSphere() {
+    let vertexList = [];
+
+    let u = 0,
+        t = 0;
+    while (u < Math.PI * 2) {
+        while (t < Math.PI) {
+            vertexList.push(...sphere(u, t))
+            vertexList.push(...sphere(u + 0.1, t))
+            vertexList.push(...sphere(u, t + 0.1))
+            vertexList.push(...sphere(u, t + 0.1))
+            vertexList.push(...sphere(u + 0.1, t))
+            vertexList.push(...sphere(u + 0.1, t + 0.1))
+            t += 0.1;
+        }
+        t = 0;
+        u += 0.1;
+    }
+    return vertexList;
+}
+const radius = 0.1;
+function sphere(long, lat) {
+    return [
+        radius * Math.cos(long) * Math.sin(lat),
+        radius * Math.sin(long) * Math.sin(lat),
+        radius * Math.cos(lat)
+    ]
 }
 const scaler = 0.1
 function monge(a, t) {
@@ -204,6 +256,11 @@ function initGL() {
     surface = new Model('Surface');
     surface.BufferData(CreateSurfaceData());
     surface.BufferDataNormal(CreateSurfaceDataNormal());
+    surfaceLight = new Model();
+    surfaceLight.BufferData(CreateSurfaceDataSphere());
+    surfaceLight.BufferDataNormal(CreateSurfaceDataSphere());
+    surfaceLightLine = new Model();
+    surfaceLightLine.BufferData([0, 0, 0, 1, 1, 1]);
 
     gl.enable(gl.DEPTH_TEST);
 }
@@ -269,5 +326,5 @@ function init() {
 
     spaceball = new TrackballRotator(canvas, draw, 0);
 
-    draw();
+    reDraw();
 }

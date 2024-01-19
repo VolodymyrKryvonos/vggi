@@ -29,10 +29,10 @@ uniform vec3 lightLocation;
 uniform vec3 lightDirection;
 uniform float angle, focus;
 void main() {
-    vec3 toLight = normalize(lightLocation-vertex_v);
-    vec3 toView = normalize(-vertex_v);
+    vec3 toLight = normalize(lightLocation+vertex_v);
+    vec3 toView = normalize(vertex_v);
     vec3 halfVector = normalize(toLight + toView);
-    vec3 N = normalize(normal_v);
+    vec3 N = -normalize(normal_v);
     float dotFromDirection = dot(toLight, 
                                -lightDirection);
     float inLight = smoothstep(angle,angle+focus, dotFromDirection);
@@ -40,4 +40,7 @@ void main() {
     float specular = inLight * pow(dot(N, halfVector), 150.0);
     vec3 newColor = color.rgb*light+specular;
     gl_FragColor = vec4(newColor,1.0);
+    if(angle<0.0){
+         gl_FragColor = vec4(1.0);
+    }
 }`;
