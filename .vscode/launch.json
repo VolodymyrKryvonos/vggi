@@ -3,9 +3,9 @@
     "configurations": [
         {
             "name": "Launch index.html",
-            "type": "firefox",
+            "type": "chrome",
             "request": "launch",
             "file": "${workspaceFolder}/index.html"
-        },
+        }
     ]
 }
