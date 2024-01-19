@@ -6,9 +6,52 @@ let shProgram;                  // A shader program
 let spaceball;                  // A SimpleRotator object that lets the user rotate the view by mouse.
 let surfaceLight;
 let surfaceLightLine;
+let pointLoc = [0, 0]
+
+window.onkeydown = (e) => {
+    console.log(e.keyCode)
+    if (e.keyCode == 87) {
+        pointLoc[0] = Math.min(pointLoc[0] + 0.1, 1);
+    }
+    else if (e.keyCode == 83) {
+        pointLoc[0] = Math.max(pointLoc[0] - 0.1, 0);
+    }
+    else if (e.keyCode == 65) {
+        pointLoc[1] = Math.max(pointLoc[1] - 0.1, 0);
+    }
+    else if (e.keyCode == 68) {
+        pointLoc[1] = Math.min(pointLoc[1] + 0.1, 1);
+    }
+
+
+}
 
 function deg2rad(angle) {
     return angle * Math.PI / 180;
+}
+
+function LoadTexture() {
+    let texture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    const image = new Image();
+    image.crossOrigin = 'anonymus';
+    image.src = "https://raw.githubusercontent.com/VolodymyrKryvonos/vggi/PA3/texture.jpg";
+    image.onload = () => {
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            image
+        );
+        console.log("imageLoaded")
+        draw()
+    }
 }
 
 
@@ -17,6 +60,7 @@ function Model(name) {
     this.name = name;
     this.iVertexBuffer = gl.createBuffer();
     this.iNormalBuffer = gl.createBuffer();
+    this.iTextureBuffer = gl.createBuffer();
     this.count = 0;
 
     this.BufferData = function (vertices) {
@@ -32,6 +76,12 @@ function Model(name) {
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normals), gl.STREAM_DRAW);
 
     }
+    this.BufferDataTexture = function (textures) {
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.iTextureBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textures), gl.STREAM_DRAW);
+
+    }
 
     this.Draw = function () {
 
@@ -41,6 +91,9 @@ function Model(name) {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.iNormalBuffer);
         gl.vertexAttribPointer(shProgram.iAttribNormal, 3, gl.FLOAT, false, 0, 0);
         gl.enableVertexAttribArray(shProgram.iAttribNormal);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.iTextureBuffer);
+        gl.vertexAttribPointer(shProgram.iAttribTexture, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(shProgram.iAttribTexture);
 
         gl.drawArrays(gl.TRIANGLES, 0, this.count);
     }
@@ -113,20 +166,22 @@ function draw() {
     gl.uniform3fv(shProgram.iLightLocation, [cos(time), sin(time), z1]);
     // gl.uniform3fv(shProgram.iLightDirection, [-cos(time), -sin(time), -z1]);
     // gl.uniform3fv(shProgram.iLightLocation, [x1, y1, z1]);
-    gl.uniform3fv(shProgram.iLightDirection, [-(cos(time)- x2), -(sin(time) - y2), -(z1 - z2)]);
+    gl.uniform3fv(shProgram.iLightDirection, [-(cos(time) - x2), -(sin(time) - y2), -(z1 - z2)]);
     gl.uniform1f(shProgram.iAngle, document.getElementById('angle').value);
     gl.uniform1f(shProgram.iFocus, document.getElementById('focus').value);
+    gl.uniform1f(shProgram.iR1, document.getElementById('r1').value);
+    gl.uniform2fv(shProgram.iPL, pointLoc);
 
     surface.Draw();
     gl.uniform1f(shProgram.iAngle, -1);
     gl.uniformMatrix4fv(shProgram.iModelViewProjectionMatrix, false, m4.multiply(
         modelViewProjection,
-        m4.translation(cos(time), sin(time), z1)
+        m4.translation(...monge(pointLoc[0]*numStepsI/10,pointLoc[1]*numStepsJ/10))
         // m4.translation(x1, y1, z1)
     ));
     surfaceLight.Draw();
-    surfaceLightLine.BufferData([0, 0, 0, -cos(time), -sin(time), -z1]);
-    surfaceLightLine.DrawLine()
+    // surfaceLightLine.BufferData([0, 0, 0, -cos(time), -sin(time), -z1]);
+    // surfaceLightLine.DrawLine()
 }
 
 function reDraw() {
@@ -135,11 +190,11 @@ function reDraw() {
     draw()
     window.requestAnimationFrame(reDraw)
 }
-
+let numStepsI = 100,
+    numStepsJ = numStepsI / 2;
 function CreateSurfaceData() {
     let vertexList = [];
-    let numStepsI = 100,
-        numStepsJ = numStepsI / 2;
+
 
     for (let i = 0; i < numStepsI; i++) {
         for (let j = -numStepsJ; j < numStepsJ; j++) {
@@ -156,8 +211,6 @@ function CreateSurfaceData() {
 }
 function CreateSurfaceDataNormal() {
     let normalList = [];
-    let numStepsI = 100,
-        numStepsJ = numStepsI / 2;
 
     for (let i = 0; i < numStepsI; i++) {
         for (let j = -numStepsJ; j < numStepsJ; j++) {
@@ -167,6 +220,22 @@ function CreateSurfaceDataNormal() {
             normalList.push(...mongeNormal((i) / 10, (j + 1) / 10))
             normalList.push(...mongeNormal((i + 1) / 10, (j) / 10))
             normalList.push(...mongeNormal((i + 1) / 10, (j + 1) / 10))
+        }
+    }
+
+    return normalList;
+}
+function CreateSurfaceDataTexture() {
+    let normalList = [];
+
+    for (let i = 0; i < numStepsI; i++) {
+        for (let j = -numStepsJ; j < numStepsJ; j++) {
+            normalList.push((i) / numStepsI, (j) / numStepsJ)
+            normalList.push((i + 1) / numStepsI, (j) / numStepsJ)
+            normalList.push((i) / numStepsI, (j + 1) / numStepsJ)
+            normalList.push((i) / numStepsI, (j + 1) / numStepsJ)
+            normalList.push((i + 1) / numStepsI, (j) / numStepsJ)
+            normalList.push((i + 1) / numStepsI, (j + 1) / numStepsJ)
         }
     }
 
@@ -246,19 +315,24 @@ function initGL() {
 
     shProgram.iAttribVertex = gl.getAttribLocation(prog, "vertex");
     shProgram.iAttribNormal = gl.getAttribLocation(prog, "normal");
+    shProgram.iAttribTexture = gl.getAttribLocation(prog, "texture");
     shProgram.iModelViewProjectionMatrix = gl.getUniformLocation(prog, "ModelViewProjectionMatrix");
     shProgram.iColor = gl.getUniformLocation(prog, "color");
     shProgram.iLightLocation = gl.getUniformLocation(prog, "lightLocation");
     shProgram.iLightDirection = gl.getUniformLocation(prog, "lightDirection");
     shProgram.iAngle = gl.getUniformLocation(prog, "angle");
     shProgram.iFocus = gl.getUniformLocation(prog, "focus");
+    shProgram.iPL = gl.getUniformLocation(prog, "pointLoc");
+    shProgram.iR1 = gl.getUniformLocation(prog, "r1");
 
     surface = new Model('Surface');
     surface.BufferData(CreateSurfaceData());
     surface.BufferDataNormal(CreateSurfaceDataNormal());
+    surface.BufferDataTexture(CreateSurfaceDataTexture());
     surfaceLight = new Model();
     surfaceLight.BufferData(CreateSurfaceDataSphere());
     surfaceLight.BufferDataNormal(CreateSurfaceDataSphere());
+    surfaceLight.BufferDataTexture(CreateSurfaceDataSphere());
     surfaceLightLine = new Model();
     surfaceLightLine.BufferData([0, 0, 0, 1, 1, 1]);
 
@@ -327,4 +401,5 @@ function init() {
     spaceball = new TrackballRotator(canvas, draw, 0);
 
     reDraw();
+    LoadTexture()
 }

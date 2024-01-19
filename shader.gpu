@@ -4,13 +4,69 @@
 const vertexShaderSource = `
 attribute vec3 vertex;
 attribute vec3 normal;
+attribute vec2 texture;
 uniform mat4 ModelViewProjectionMatrix;
 varying vec3 vertex_v;
 varying vec3 normal_v;
+varying vec2 texture_v;
+uniform vec2 pointLoc;
+uniform float r1; 
+
+mat4 translation(vec2 t) {
+    mat4 dst;
+
+    dst[0][0] = 1.0;
+    dst[0][ 1] = 0.0;
+    dst[0][ 2] = 0.0;
+    dst[0][ 3] = 0.0;
+    dst[1][ 0] = 0.0;
+    dst[1][ 1] = 1.0;
+    dst[1][ 2] = 0.0;
+    dst[1][ 3] = 0.0;
+    dst[2][ 0] = 0.0;
+    dst[2][ 1] = 0.0;
+    dst[2][ 2] = 1.0;
+    dst[2][ 3] = 0.0;
+    dst[3][ 0] = t.x;
+    dst[3][ 1] = t.y;
+    dst[3][ 2] = 0.0;
+    dst[3][ 3] = 1.0;
+
+    return dst;
+}
+
+mat4 rotation(float angleInRadians) {
+    mat4 dst;
+    float c = cos(angleInRadians);
+    float s = sin(angleInRadians);
+
+    dst[0][0] = c;
+    dst[0][ 1] = s;
+    dst[0][ 2] = 0.0;
+    dst[0][ 3] = 0.0;
+    dst[1][ 0] = -s;
+    dst[1][ 1] = c;
+    dst[1][ 2] = 0.0;
+    dst[1][ 3] = 0.0;
+    dst[2][ 0] = 0.0;
+    dst[2][ 1] = 0.0;
+    dst[2][ 2] = 1.0;
+    dst[2][ 3] = 0.0;
+    dst[3][ 0] = 0.0;
+    dst[3][ 1] = 0.0;
+    dst[3][ 2] = 0.0;
+    dst[3][ 3] = 1.0;
+
+    return dst;
+}
 
 void main() {
+    vec4 v1 = translation(-pointLoc)*vec4(texture,0.0,1.0);
+    vec4 v2 = rotation(r1)*v1;
+    vec4 v3 = translation(pointLoc)*v2;
     vertex_v = vertex;
     normal_v = normal;
+    texture_v = v3.xy;
     gl_Position = ModelViewProjectionMatrix * vec4(vertex,1.0);
 }`;
 
@@ -24,10 +80,12 @@ const fragmentShaderSource = `
 #endif
 varying vec3 vertex_v;
 varying vec3 normal_v;
+varying vec2 texture_v;
 uniform vec4 color;
 uniform vec3 lightLocation;
 uniform vec3 lightDirection;
 uniform float angle, focus;
+uniform sampler2D tmu;
 void main() {
     vec3 toLight = normalize(lightLocation+vertex_v);
     vec3 toView = normalize(vertex_v);
@@ -40,6 +98,7 @@ void main() {
     float specular = inLight * pow(dot(N, halfVector), 150.0);
     vec3 newColor = color.rgb*light+specular;
     gl_FragColor = vec4(newColor,1.0);
+    gl_FragColor = texture2D(tmu,texture_v);
     if(angle<0.0){
          gl_FragColor = vec4(1.0);
     }
